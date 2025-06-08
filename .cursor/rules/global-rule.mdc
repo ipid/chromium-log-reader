@@ -1,0 +1,118 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# 注意事项
+
+这是一个 Vue 3.5 + TypeScript + SCSS 的项目，使用 element-plus 作为组件库，使用 pnpm + Prettier 进行工程化。
+
+请你在生成代码时注意：
+
+1. 你生成的代码需要使用 Vue 3.5 语法，使用 TypeScript 语言，生成的样式需要是 SCSS。禁止生成非 Vue 3.5 的代码（如 Vue 2 代码、React 代码、Tailwind CSS 代码等），禁止生成类型标注不齐、类型不正确的代码；禁止生成纯 CSS 代码或 Less、Stylus 代码；禁止生成 vue-router、VueX、pinia 代码（本项目不使用这些库）。
+2. 除非有别的指令，你只能生成 *.vue、*.scss、*.ts 文件。
+3. 你生成的每一个 .vue 文件必须符合以下格式，顺序符合以下顺序，script 使用 ts setup，style 使用 scss scoped。以下以组件 GridPanelViewer.vue 为例：
+
+// GridPanelViewer.vue
+```vue
+<script lang="ts" setup>
+// import ...
+// import ...
+
+// --- 先 defineProps，再 defineEmits，再 use hook，再定义 ref，再定义 computed，最后定义 function ---
+
+// 使用 defineProps，而且使用在泛型参数中编写 props 的语法（而不是在 defineProps 的参数中传入）
+const props = defineProps<{
+  title: string;
+  isActive: boolean
+}>()
+
+// 使用 defineEmits，而且使用 `(e: 'changeActive', value: boolean): void` 的写法
+const emit = defineEmits<{
+  (e: 'changeActive', value: boolean): void
+}>()
+
+// const ... = useXxx()
+
+// const ... = ref()
+
+// const ... = computed(...)
+
+// 使用 async function、function 的写法，而不是箭头函数
+// function handleClick() {
+//}
+</script>
+
+<template>
+  <!-- ... -->
+  <!-- template 中只能使用 class，禁止编写 id；每个 class 需要符合 BEM 格式，以当前组件名的缩写为开头 -->
+  <div
+    class="gr-pnl-view__container"
+    :class="{
+      'gr-pnl-view__container--active': isActive,
+    }"
+  >
+    <header class="gr-pnl-view__header">
+      <div class="gr-pnl-view__header-title">
+        <span class="gr-pnl-view__header-title-text">
+          {{ title }}
+        </span>
+      </div>
+    </header>
+
+    <main class="gr-pnl-view__main">
+      <div class="gr-pnl-view__main-content">
+        <!-- ... -->
+      </div>
+    </main>
+  </div>
+</template>
+
+<style lang="scss" scoped>
+@use './xxxx.scss' as xxxx;
+
+// 此处的选择器必须是嵌套的，且其出现顺序、嵌套关系必须符合 <template> 中的出现顺序和嵌套关系。例如，下面的样式与上方的 template 一一对应。
+.gr-pnl-view__container {
+  // 注意：严禁使用 `&--active` 的写法来省略类名，必须每次都把完整的类名展示出来。
+  &.gr-pnl-view__container--active {
+    // ...
+  }
+
+  .gr-pnl-view__header {
+    .gr-pnl-view__header-title {
+      .gr-pnl-view__header-title-text {
+        // ...
+      }
+    }
+  }
+
+  .gr-pnl-view__main {
+    .gr-pnl-view__main-content {
+      // ...
+    }
+  }
+}
+</style>
+```
+
+3. 你必须使用，且仅使用 element-plus 组件库。禁止使用 HTML 原生组件（如 <input>、<table>、<button> 等），你必须仅使用 Element Plus 提供的组件（如 <ElInput>、<ElTable>、<ElButton>）。
+4. 你生成的所有内容都只能使用“简体中文”这一种语言，严禁使用其它语言。
+5. 关于命名规范：组件名使用 PascalCase（如 `<GridPanelViewer :prop=prop>`），变量名、函数名、prop 属性名、emit 事件名使用 camelCase（如 `const isActive` 和 `defineProps<>();`）
+6. 关于静态可预测性：你必须保证代码有良好的静态可预测性，只要静态地阅读代码就能了解整个代码的运行流程，这意味着：
+  - 禁止使用可选参数、参数默认值：props、函数参数、type 定义等地方禁止使用可选字段（如：禁止 `field?: string` 的写法）；禁止在 prop、函数参数中提供默认值（如：禁止 withDefaults，禁止 `function someFunc(value = 1)`。如果你需要定义某个字段可能为空，请使用 `field: string | null` 的写法。
+  - 尽量避免动态化的代码（如使用 Object.entries 遍历对象，定义一个不知道指向哪处代码的闭包变量等），尽量把 TypeScript 当成一门静态编译语言来编写。
+
+
+# 目录结构
+
+一般来说，你只需要关注 src/ 目录下的文件。
+
+# 反思
+
+你必须在生成代码后反思：
+1. 上述代码的设计，是否具有高可扩展性、高可维护性、易读性？
+2. 是否有没考虑到的点，或者有 bug 导致无法使用？
+3. 上述代码中，哪些部分不符合项目的代码风格要求？
+4. 是否存在 Lint 问题？
+
+如果上述反思中找到了问题，请你修复问题。
