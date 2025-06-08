@@ -102,7 +102,6 @@ const emit = defineEmits<{
   - 禁止使用可选参数、参数默认值：props、函数参数、type 定义等地方禁止使用可选字段（如：禁止 `field?: string` 的写法）；禁止在 prop、函数参数中提供默认值（如：禁止 withDefaults，禁止 `function someFunc(value = 1)`。如果你需要定义某个字段可能为空，请使用 `field: string | null` 的写法。
   - 尽量避免动态化的代码（如使用 Object.entries 遍历对象，定义一个不知道指向哪处代码的闭包变量等），尽量把 TypeScript 当成一门静态编译语言来编写。
 
-
 # 目录结构
 
 一般来说，你只需要关注 src/ 目录下的文件。
