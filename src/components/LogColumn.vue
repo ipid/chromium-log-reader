@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import LogItem from './LogItem.vue'
 import type { LogContent } from '../types/log'
+import { onMounted, ref, watch } from 'vue'
 
 /**
  * 日志列组件
@@ -8,6 +9,8 @@ import type { LogContent } from '../types/log'
  */
 const props = defineProps<{
   items: LogContent[]
+  title: string | null
+  activeItem: LogContent | null
 }>()
 
 /**
@@ -17,6 +20,8 @@ const emit = defineEmits<{
   (e: 'itemClick', item: LogContent): void
 }>()
 
+const refContainer = ref<HTMLDivElement | null>(null)
+
 /**
  * 处理单个日志项的点击事件
  * 将被点击的日志项信息向上传递给父组件
@@ -24,14 +29,31 @@ const emit = defineEmits<{
 function handleItemClick(item: LogContent): void {
   emit('itemClick', item)
 }
+
+function scrollSelfToView() {
+  refContainer.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'end' })
+}
+
+onMounted(scrollSelfToView)
+watch(() => props.items, scrollSelfToView)
 </script>
 
 <template>
-  <div class="log-col__container">
+  <div ref="refContainer" class="log-col__container">
+    <header v-if="title !== null && title !== ''" class="log-col__header">
+      <span class="log-col__header-title">【标题：{{ title }}】</span>
+    </header>
     <div v-if="items.length === 0" class="log-col__empty">
       <span>没有日志数据</span>
     </div>
-    <LogItem v-for="item in items" :key="item.id" :item="item" @click="handleItemClick(item)" class="log-col__item" />
+    <LogItem
+      v-for="(item, index) in items"
+      :key="index"
+      :item="item"
+      :is-active="item === activeItem"
+      @click="handleItemClick(item)"
+      class="log-col__item"
+    />
   </div>
 </template>
 
@@ -39,24 +61,23 @@ function handleItemClick(item: LogContent): void {
 .log-col__container {
   width: 300px;
   min-width: 300px;
-  height: 100%;
   overflow-y: auto;
   border-right: 1px solid #e0e0e0;
   background-color: #ffffff;
+  border-radius: 4px;
+  overflow: hidden auto;
   padding: 8px;
+}
 
-  // 提供滚动条样式以增强用户体验
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
+.log-col__header {
+  padding: 0 4px 12px 4px;
+  border-bottom: 1px solid #e0e0e0;
+  margin-bottom: 8px;
 
-  &::-webkit-scrollbar-thumb {
-    background-color: #c0c4cc;
-    border-radius: 3px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background-color: #f5f7fa;
+  .log-col__header-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: #303133;
   }
 }
 

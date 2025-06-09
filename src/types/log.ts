@@ -1,63 +1,30 @@
-/**
- * 日志内容的接口定义
- * 用于描述单条日志或日志容器的结构
- */
-export interface LogContent {
-  /**
-   * 日志的唯一标识符
-   * 格式为函数调用路径加可能的索引，如 "1-2-3" 或 "1-2-3::4"
-   */
-  id: string
-
-  /**
-   * 是否为容器类型日志
-   * true: 表示该日志是一个容器，包含子日志
-   * false: 表示该日志是一个简单的文本日志
-   */
-  isContainer: boolean
-
-  /**
-   * 日志的文本内容
-   * 对于简单日志，存储完整的日志文本
-   * 对于容器日志，通常为空字符串
-   */
-  text: string
-
-  /**
-   * 日志的标题
-   * 对于容器日志，通常是函数名
-   * 对于简单日志，通常为空字符串
-   */
-  title: string
-
-  /**
-   * 子日志列表
-   * 对于容器日志，包含所有子日志
-   * 对于简单日志，为空数组
-   */
-  children: LogContent[]
-
-  /**
-   * 摘要信息
-   * 用于在容器日志折叠时展示第一条和最后一条子日志的摘要
-   */
-  summary: {
-    /**
-     * 第一条子日志的摘要文本
-     * 如果没有子日志或无法获取摘要，则为null
-     */
-    first: string | null
-
-    /**
-     * 最后一条子日志的摘要文本
-     * 如果没有子日志或无法获取摘要，则为null
-     */
-    last: string | null
-  }
-
-  /**
-   * 当前日志是否处于激活状态
-   * 用于UI高亮显示当前选中的日志
-   */
-  isActive: boolean
+export enum LogType {
+  /** 简单日志，没有子日志 */
+  Simple = 'Simple',
+  /** 容器日志，包含标题和子日志 */
+  Container = 'Container',
 }
+
+/** 简单日志数据结构定义，为不可变对象 */
+export type SimpleLogContent = {
+  readonly type: LogType.Simple
+
+  /** 日志的文本内容 */
+  readonly text: string
+}
+
+/**
+ * 容器日志数据结构定义，为不可变对象。
+ * 一个 ContainerLogContent 负责存储属于同一个 # 标号的日志，所有具有相同 # 标号的日志会作为简单日志存储在 subLogs 中。
+ */
+export type ContainerLogContent = {
+  readonly type: LogType.Container
+
+  /** 容器日志的标题，从日志的函数名中获取 */
+  readonly title: string
+
+  /** 容器日志所包含的子日志，有可能是简单日志，也有可能是容器日志 */
+  readonly subLogs: readonly LogContent[]
+}
+
+export type LogContent = SimpleLogContent | ContainerLogContent

@@ -1,237 +1,172 @@
-import type { LogContent } from '../types/log'
+import { LogType } from '../types/log'
+import type { SimpleLogContent, ContainerLogContent } from '../types/log'
 
 // 解析后的单条日志行的数据结构
-interface ParsedLogLine {
-  functionName: string
-  id: string
-  stack: string[]
+type ParsedLogGroup = {
+  funcName: string
+  id: number
+  stack: number[]
   message: string
-  raw: string
 }
 
 /**
  * 从日志行中提取函数名、ID、调用栈和消息内容
  */
-function extractLogInfo(line: string): { functionName: string; id: string; stackStr: string; message: string } | null {
-  const regex = /^\[ipid\]\[(.*?)\]\[#(\d+) \(\$(.*?)\)\] (.*)$/
-  const match = line.match(regex)
+export function extractLogInfo(logGroup: string): ParsedLogGroup | null {
+  logGroup = logGroup.trim()
+
+  const regex = /\[(?<funcName>[^\]]+)\]\[#(?<id>\d+) \((?<stack>\$\d+(-\$\d+)*)\)\](?<message>(.|\n)*)/
+  const match = logGroup.match(regex)
 
   if (match === null || match.length < 5) {
     return null
   }
 
-  return {
-    functionName: match[1],
-    id: match[2],
-    stackStr: match[3],
-    message: match[4],
-  }
-}
+  const { funcName: funcNameText, id: idText, stack: stackText, message: messageText } = match.groups || {}
 
-/**
- * 处理单个日志组，包含一个[ipid]开头的行及其后续行
- */
-function parseLogGroup(group: string[]): ParsedLogLine | null {
-  if (group.length === 0) {
-    return null
-  }
+  const funcName = funcNameText.trim()
+  const id = Number(idText)
+  const message = messageText.trim()
 
-  const firstLine = group[0]
-  const logInfo = extractLogInfo(firstLine)
-
-  if (logInfo === null) {
-    return null
-  }
-
-  const stack = logInfo.stackStr.split('-')
+  // 解析调用栈
+  const stack = stackText
+    .replaceAll('$', '')
+    .split('-')
+    .map((segment) => Number(segment))
 
   // 验证ID与调用栈的一致性
-  if (logInfo.id !== stack[stack.length - 1]) {
+  if (id !== stack[stack.length - 1]) {
     return null
   }
 
-  // 构建完整消息内容
-  let fullMessage = logInfo.message
-  for (let i = 1; i < group.length; i++) {
-    fullMessage = fullMessage + '\n' + group[i]
-  }
-
   return {
-    functionName: logInfo.functionName,
-    id: logInfo.id,
-    stack: stack,
-    message: fullMessage,
-    raw: group.join('\n'),
+    funcName,
+    id,
+    stack,
+    message,
   }
 }
 
-/**
- * 提取日志内容的第一行作为摘要
- */
-function extractSummary(text: string): string {
-  const lines = text.split('\n')
-  if (lines.length === 0) {
-    return ''
-  }
-  return lines[0]
+export function getParsedLogGroups(logText: string): ParsedLogGroup[] {
+  return logText
+    .split('[ipid]')
+    .map((group) => extractLogInfo(group))
+    .filter((x): x is ParsedLogGroup => x != null)
 }
 
 /**
- * 从普通日志或容器中获取摘要
+ * 建立标号到函数名的映射
  */
-function getSummaryFromLogItem(item: LogContent | null): string | null {
-  if (item === null) {
-    return null
-  }
+export function buildIdToFunctionMap(parsedGroups: ParsedLogGroup[]): Map<number, string> {
+  const idToFunctionMap = new Map<number, string>()
 
-  if (item.isContainer === false) {
-    return extractSummary(item.text)
-  } else {
-    return item.summary.first
-  }
-}
+  for (const line of parsedGroups) {
+    const existingFuncName = idToFunctionMap.get(line.id)
 
-/**
- * 创建日志容器
- */
-function createContainer(representativeLine: ParsedLogLine, children: LogContent[]): LogContent {
-  let firstChild: LogContent | null = null
-  let lastChild: LogContent | null = null
-
-  if (children.length > 0) {
-    firstChild = children[0]
-    lastChild = children[children.length - 1]
-  }
-
-  const firstSummary = getSummaryFromLogItem(firstChild)
-  const lastSummary = getSummaryFromLogItem(lastChild)
-
-  return {
-    id: representativeLine.stack.join('-'),
-    isContainer: true,
-    title: representativeLine.functionName,
-    text: '',
-    children: children,
-    summary: {
-      first: firstSummary,
-      last: lastSummary,
-    },
-    isActive: false,
-  }
-}
-
-/**
- * 创建简单日志条目
- */
-function createSimpleLogItem(logLine: ParsedLogLine, index: number): LogContent {
-  return {
-    id: logLine.stack.join('-') + '::' + index.toString(),
-    isContainer: false,
-    text: logLine.message,
-    title: '',
-    children: [],
-    summary: { first: null, last: null },
-    isActive: false,
-  }
-}
-
-/**
- * 递归处理日志行，构建日志树
- */
-function processLogLines(lines: ParsedLogLine[]): LogContent[] {
-  if (lines.length === 0) {
-    return []
-  }
-
-  const result: LogContent[] = []
-  const baseLevel: number = lines[0].stack.length
-  let i: number = 0
-
-  while (i < lines.length) {
-    const currentLine: ParsedLogLine = lines[i]
-
-    // 处理当前层级的简单日志
-    if (currentLine.stack.length === baseLevel) {
-      result.push(createSimpleLogItem(currentLine, i))
-      i = i + 1
+    if (existingFuncName && existingFuncName !== line.funcName) {
+      throw new Error(`单个日志 id 对应多个函数名: ${line.id} 对应 ${existingFuncName} 和 ${line.funcName}`)
     }
-    // 处理嵌套子日志
-    else if (currentLine.stack.length > baseLevel) {
-      const subGroup: ParsedLogLine[] = []
-      const subGroupLevel: number = currentLine.stack.length
 
-      // 收集所有属于此子组的日志行
-      let j: number = i
-      while (j < lines.length && lines[j].stack.length >= subGroupLevel) {
-        subGroup.push(lines[j])
-        j = j + 1
+    idToFunctionMap.set(line.id, line.funcName)
+  }
+
+  return idToFunctionMap
+}
+
+/**
+ * 处理缺失的中间层级，构建完整的嵌套结构
+ */
+export function buildNestedStructure(
+  parsedGroups: ParsedLogGroup[],
+  idToFunctionMap: Map<number, string>,
+): ContainerLogContent {
+  // 定义可变的容器类型，用于高效构建树结构
+  // 该结构与只读的 ContainerLogContent 兼容
+  type MutableContainer = {
+    readonly type: LogType.Container
+    readonly title: string
+    readonly subLogs: (SimpleLogContent | MutableContainer)[]
+  }
+
+  // 用于缓存和快速访问每个 ID 对应的容器
+  const idToContainerMap = new Map<number, MutableContainer>()
+
+  // 虚拟根节点，便于处理多入口的日志结构
+  const virtualRoot: MutableContainer = {
+    type: LogType.Container,
+    title: 'virtual_root',
+    subLogs: [],
+  }
+
+  for (const group of parsedGroups) {
+    const { id, stack, message } = group
+
+    let parentContainer: MutableContainer = virtualRoot
+
+    // 确保当前日志的所有祖先路径在树中都已存在
+    // 遍历到当前日志 ID 的父级为止
+    for (let i = 0; i < stack.length; i++) {
+      const currLevelId = stack[i]
+      let currLevelContainer = idToContainerMap.get(currLevelId)
+
+      // 如果某个祖先 ID 的容器不存在，则动态创建
+      // 这样可以处理中间层级日志缺失的情况
+      if (!currLevelContainer) {
+        currLevelContainer = {
+          type: LogType.Container,
+          title: idToFunctionMap.get(currLevelId) || '', // 如果没有日志定义函数名，标题可能为空
+          subLogs: [],
+        }
+        idToContainerMap.set(currLevelId, currLevelContainer)
+        parentContainer.subLogs.push(currLevelContainer)
       }
-
-      // 递归处理子组并创建容器
-      const children: LogContent[] = processLogLines(subGroup)
-      const container: LogContent = createContainer(currentLine, children)
-      result.push(container)
-
-      i = j // 移动索引到已处理组之后
+      parentContainer = currLevelContainer
     }
-    // 处理异常情况
-    else {
-      i = i + 1
+
+    // 获取或创建当前日志 ID 的容器。一定存在，上面的循环已经处理过了
+    const currentContainer = idToContainerMap.get(id)!
+
+    // 将实际的日志消息作为 SimpleLog 添加到其容器中
+    const simpleLog: SimpleLogContent = {
+      type: LogType.Simple,
+      text: message,
+    }
+    currentContainer.subLogs.push(simpleLog)
+  }
+
+  // 如果没有任何日志，返回一个空容器
+  if (virtualRoot.subLogs.length === 0) {
+    return {
+      type: LogType.Container,
+      title: '',
+      subLogs: [],
     }
   }
 
-  return result
-}
-
-/**
- * 将原始日志文本按 [ipid] 分组
- */
-function groupLogLines(logText: string): string[][] {
-  const rawLines: string[] = logText.split('\n')
-  const groups: string[][] = []
-  let currentGroup: string[] = []
-
-  for (let i = 0; i < rawLines.length; i++) {
-    const line: string = rawLines[i]
-    const trimmedLine = line.trim()
-
-    if (trimmedLine.startsWith('[ipid]')) {
-      // 保存当前组并开始新组
-      if (currentGroup.length > 0) {
-        groups.push(currentGroup)
-      }
-      currentGroup = [line]
-    }
-    // 将非 [ipid] 开头的行添加到当前组
-    else if (currentGroup.length > 0) {
-      currentGroup.push(line)
-    }
+  // 如果只有一个顶层日志，则直接返回该日志作为根节点
+  // 这样符合单元测试的预期
+  if (virtualRoot.subLogs.length === 1) {
+    return virtualRoot.subLogs[0] as ContainerLogContent
   }
 
-  // 添加最后一组
-  if (currentGroup.length > 0) {
-    groups.push(currentGroup)
+  // 如果有多个顶层日志，则用一个根容器包裹
+  // 这样可以兼容没有单一公共祖先的日志情况
+  return {
+    type: LogType.Container,
+    title: '', // 根部没有合适的标题
+    subLogs: virtualRoot.subLogs,
   }
-
-  return groups
 }
 
 /**
  * 主解析函数：将日志文本转换为结构化的日志树
  */
-export function parseLog(logText: string): LogContent[] {
-  // 第一步：按 [ipid] 标记分组
-  const groups = groupLogLines(logText)
+export function parseLog(logText: string): { rootLog: ContainerLogContent } {
+  // 解析每个分组，丢掉不符合格式的分组
+  const parsedGroups = getParsedLogGroups(logText)
 
-  // 第二步：解析每个组并过滤无效日志
-  const parsedLines: ParsedLogLine[] = []
-  for (let i = 0; i < groups.length; i++) {
-    const parsed = parseLogGroup(groups[i])
-    if (parsed !== null) {
-      parsedLines.push(parsed)
-    }
-  }
+  const idToFunctionMap = buildIdToFunctionMap(parsedGroups)
+  const rootLog = buildNestedStructure(parsedGroups, idToFunctionMap)
 
-  // 第三步：处理日志行构建树状结构
-  return processLogLines(parsedLines)
+  return { rootLog }
 }

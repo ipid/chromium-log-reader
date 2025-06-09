@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
-import type { LogContent } from '../types/log'
+import type { LogContent, SimpleLogContent } from '../types/log'
+import { LogType } from '../types/log'
 import { ElIcon } from 'element-plus'
 import { MoreFilled, Document } from '@element-plus/icons-vue'
 
@@ -10,52 +11,45 @@ import { MoreFilled, Document } from '@element-plus/icons-vue'
  */
 const props = defineProps<{
   item: LogContent
+  isActive: boolean
 }>()
 
 /**
- * 计算组件类名，根据日志项状态动态添加修饰符
+ * 提取摘要，即容器中第一条简单日志的文本
  */
-const containerClassNames = computed<string[]>(function () {
-  const classNames = ['log-itm__container']
-
-  if (props.item.isActive === true) {
-    classNames.push('log-itm__container--active')
+const firstSummary = computed<string | null>(function () {
+  if (props.item.type !== LogType.Container) {
+    return null
   }
-
-  if (props.item.isContainer === true) {
-    classNames.push('log-itm__container--container')
-  }
-
-  return classNames
+  const firstSimpleLog = props.item.subLogs.find((log): log is SimpleLogContent => log.type === LogType.Simple)
+  return firstSimpleLog?.text ?? null
 })
 
 /**
- * 提取摘要的前70个字符，确保摘要显示合理
+ * 提取末尾摘要，即容器中最后一条简单日志的文本
  */
-const firstSummary = computed<string>(function () {
-  if (props.item.summary.first === null) {
-    return ''
+const lastSummary = computed<string | null>(function () {
+  if (props.item.type !== LogType.Container) {
+    return null
   }
-  const text = props.item.summary.first
-  return text.length > 70 ? text.substring(0, 70) + '...' : text
-})
-
-/**
- * 提取末尾摘要的前70个字符
- */
-const lastSummary = computed<string>(function () {
-  if (props.item.summary.last === null) {
-    return ''
+  const simpleLogs = props.item.subLogs.filter((log): log is SimpleLogContent => log.type === LogType.Simple)
+  if (simpleLogs.length < 2) {
+    return null
   }
-  const text = props.item.summary.last
-  return text.length > 70 ? text.substring(0, 70) + '...' : text
+  return simpleLogs[simpleLogs.length - 1].text
 })
 </script>
 
 <template>
-  <div :class="containerClassNames">
+  <div
+    class="log-itm__container"
+    :class="{
+      'log-itm__container--active': isActive,
+      'log-itm__container--container': item.type === LogType.Container,
+    }"
+  >
     <!-- 简单消息视图 - 显示普通日志文本 -->
-    <div v-if="item.isContainer === false" class="log-itm__simple">
+    <div v-if="item.type === LogType.Simple" class="log-itm__simple">
       <div class="log-itm__simple-icon">
         <ElIcon :size="14">
           <Document />
@@ -67,7 +61,7 @@ const lastSummary = computed<string>(function () {
     </div>
 
     <!-- 容器视图 - 显示可展开的子日志集合 -->
-    <div v-if="item.isContainer === true" class="log-itm__container-view">
+    <div v-if="item.type === LogType.Container" class="log-itm__container-view">
       <header class="log-itm__container-header">
         <div class="log-itm__container-header-title">{{ item.title }}</div>
         <div class="log-itm__container-header-menu">
@@ -78,7 +72,7 @@ const lastSummary = computed<string>(function () {
       </header>
       <main class="log-itm__container-main">
         <div
-          v-if="item.summary.first !== null"
+          v-if="firstSummary !== null"
           class="log-itm__container-main-summary log-itm__container-main-summary--first"
         >
           {{ firstSummary }}
@@ -86,10 +80,7 @@ const lastSummary = computed<string>(function () {
         <div class="log-itm__container-main-details">
           <span>&gt; 点击查看详情</span>
         </div>
-        <div
-          v-if="item.summary.last !== null"
-          class="log-itm__container-main-summary log-itm__container-main-summary--last"
-        >
+        <div v-if="lastSummary !== null" class="log-itm__container-main-summary log-itm__container-main-summary--last">
           {{ lastSummary }}
         </div>
       </main>
@@ -121,7 +112,7 @@ const lastSummary = computed<string>(function () {
 .log-itm__simple {
   display: flex;
   align-items: flex-start;
-  font-size: 14px;
+  font-size: 13px;
 
   .log-itm__simple-icon {
     margin-right: 8px;
@@ -134,7 +125,7 @@ const lastSummary = computed<string>(function () {
   .log-itm__simple-text {
     color: #303133;
     white-space: pre-wrap;
-    word-break: break-word;
+    word-break: break-all;
     flex: 1;
     line-height: 1.5;
   }
@@ -150,7 +141,7 @@ const lastSummary = computed<string>(function () {
 
     .log-itm__container-header-title {
       font-weight: 600;
-      font-size: 14px;
+      font-size: 13px;
       word-break: break-word;
     }
 
@@ -163,14 +154,14 @@ const lastSummary = computed<string>(function () {
   .log-itm__container-main {
     .log-itm__container-main-summary {
       font-size: 12px;
-      color: #909399;
+      color: #606266;
       line-height: 1.4;
-      white-space: normal;
+      white-space: pre-wrap;
+      word-break: break-all;
       display: -webkit-box;
-      -webkit-line-clamp: 2;
+      -webkit-line-clamp: 3;
       -webkit-box-orient: vertical;
       overflow: hidden;
-      word-break: break-word;
 
       &.log-itm__container-main-summary--first {
         margin-bottom: 4px;
@@ -185,7 +176,7 @@ const lastSummary = computed<string>(function () {
       padding: 8px 0;
       border-top: 1px solid #f0f0f0;
       border-bottom: 1px solid #f0f0f0;
-      font-size: 13px;
+      font-size: 12px;
       color: #409eff;
       font-weight: 500;
       text-align: center;

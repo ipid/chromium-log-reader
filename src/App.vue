@@ -3,45 +3,60 @@ import { ref, computed } from 'vue'
 import { ElButton, ElDrawer, ElInput } from 'element-plus'
 import LogViewer from './components/LogViewer.vue'
 import { parseLog } from './services/logParser'
-import type { LogContent } from './types/log'
+import type { LogContent, ContainerLogContent } from './types/log'
+import { LogType } from './types/log'
 
 const isDrawerVisible = ref(false)
 const rawLog = ref('')
-const logTree = ref<LogContent[]>([])
-const columns = ref<LogContent[][]>([])
+const rootLog = ref<ContainerLogContent | null>(null)
+const activePath = ref<LogContent[]>([])
 
 const hasLog = computed(() => {
-  return logTree.value.length > 0
+  return rootLog.value !== null && rootLog.value.subLogs.length > 0
+})
+
+const columns = computed(() => {
+  if (rootLog.value === null) {
+    return []
+  }
+
+  const cols: {
+    title: string | null
+    items: LogContent[]
+  }[] = [
+    {
+      title: rootLog.value.title,
+      items: [...rootLog.value.subLogs],
+    },
+  ]
+
+  for (const activeItem of activePath.value) {
+    if (activeItem.type === LogType.Container && activeItem.subLogs.length > 0) {
+      cols.push({
+        title: activeItem.title,
+        items: [...activeItem.subLogs],
+      })
+    } else {
+      break
+    }
+  }
+  return cols
 })
 
 function handleParseLog() {
-  const parsed = parseLog(rawLog.value)
-  logTree.value = parsed
-  columns.value = [parsed]
+  const { rootLog: parsedLog } = parseLog(rawLog.value)
+  rootLog.value = parsedLog
+  activePath.value = []
   isDrawerVisible.value = false
 }
 
 function handleItemClick(item: LogContent, columnIndex: number) {
-  const wasActive = item.isActive
+  const currentActiveItem = activePath.value[columnIndex]
 
-  // Deactivate all items in the column first
-  columns.value[columnIndex].forEach((it) => {
-    it.isActive = false
-  })
-
-  // Collapse columns to the right
-  columns.value.splice(columnIndex + 1)
-
-  if (wasActive) {
-    // If it was already active, clicking again just deactivates and collapses.
-    return
-  }
-
-  // Activate the clicked item
-  item.isActive = true
-
-  if (item.isContainer && item.children.length > 0) {
-    columns.value.push(item.children)
+  if (currentActiveItem === item) {
+    activePath.value.splice(columnIndex)
+  } else {
+    activePath.value.splice(columnIndex, activePath.value.length - columnIndex, item)
   }
 }
 </script>
@@ -56,7 +71,7 @@ function handleItemClick(item: LogContent, columnIndex: number) {
     </header>
 
     <main class="app__main">
-      <LogViewer v-if="hasLog" :columns="columns" @item-click="handleItemClick" />
+      <LogViewer v-if="hasLog" :columns="columns" :active-path="activePath" @item-click="handleItemClick" />
       <div v-else class="app__main-placeholder">
         <span>点击右上角按钮输入日志内容开始使用</span>
       </div>
@@ -104,7 +119,8 @@ function handleItemClick(item: LogContent, columnIndex: number) {
 
 .app__main {
   flex-grow: 1;
-  overflow: auto;
+  overflow: hidden;
+  padding: 16px;
 
   .app__main-placeholder {
     display: flex;
@@ -124,8 +140,11 @@ function handleItemClick(item: LogContent, columnIndex: number) {
   .app__drawer-textarea {
     flex-grow: 1;
     margin-bottom: 16px;
+    display: flex;
+    flex-direction: column;
     :deep(.el-textarea__inner) {
-      height: 100% !important;
+      flex-grow: 1;
+      resize: none;
     }
   }
 }

@@ -8,7 +8,11 @@ import type { LogContent } from '../types/log'
  * 每列展示一个层级的日志，点击某列中的容器日志时，右侧会显示其子日志
  */
 const props = defineProps<{
-  columns: LogContent[][]
+  columns: {
+    title: string | null
+    items: LogContent[]
+  }[]
+  activePath: LogContent[]
 }>()
 
 /**
@@ -35,9 +39,11 @@ function handleItemClick(item: LogContent, columnIndex: number): void {
     </div>
     <template v-else>
       <LogColumn
-        v-for="(columnItems, columnIndex) in columns"
+        v-for="(column, columnIndex) in columns"
         :key="'column-' + columnIndex"
-        :items="columnItems"
+        :items="column.items"
+        :title="column.title"
+        :active-item="activePath[columnIndex] ?? null"
         @item-click="
           function (item) {
             handleItemClick(item, columnIndex)
@@ -53,39 +59,28 @@ function handleItemClick(item: LogContent, columnIndex: number): void {
 .log-vw__container {
   display: flex;
   flex-direction: row;
+  justify-content: flex-start;
+  align-items: stretch;
   height: 100%;
-  overflow-x: auto;
+  overflow: auto hidden;
   position: relative;
+  gap: 12px;
 
-  // 提供滚动条样式以增强用户体验
-  &::-webkit-scrollbar {
-    height: 6px;
+  .log-vw__empty {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    color: #909399;
+    font-size: 16px;
   }
 
-  &::-webkit-scrollbar-thumb {
-    background-color: #c0c4cc;
-    border-radius: 3px;
-  }
+  .log-vw__column {
+    flex-shrink: 0;
 
-  &::-webkit-scrollbar-track {
-    background-color: #f5f7fa;
-  }
-}
-
-.log-vw__empty {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  width: 100%;
-  color: #909399;
-  font-size: 16px;
-}
-
-.log-vw__column {
-  flex-shrink: 0;
-
-  &:last-child {
-    border-right: none;
+    &:last-child {
+      border-right: none;
+    }
   }
 }
 </style>
