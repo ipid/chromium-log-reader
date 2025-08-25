@@ -36,7 +36,7 @@ const lastSummary = computed<string | null>(function () {
   if (simpleLogs.length < 2) {
     return null
   }
-  return simpleLogs[simpleLogs.length - 1].text
+  return simpleLogs.at(-1)!.text
 })
 </script>
 
@@ -50,10 +50,11 @@ const lastSummary = computed<string | null>(function () {
   >
     <!-- 简单消息视图 - 显示普通日志文本 -->
     <div v-if="item.type === LogType.Simple" class="log-itm__simple">
-      <div class="log-itm__simple-icon">
+      <div class="log-itm__simple-aside">
         <ElIcon :size="14">
           <Document />
         </ElIcon>
+        <span class="log-itm__simple-aside__index">#{{ item.index }}</span>
       </div>
       <div class="log-itm__simple-text">
         {{ item.text || '空日志' }}
@@ -64,11 +65,6 @@ const lastSummary = computed<string | null>(function () {
     <div v-if="item.type === LogType.Container" class="log-itm__container-view">
       <header class="log-itm__container-header">
         <div class="log-itm__container-header-title">{{ item.title }}</div>
-        <div class="log-itm__container-header-menu">
-          <ElIcon>
-            <MoreFilled />
-          </ElIcon>
-        </div>
       </header>
       <main class="log-itm__container-main">
         <div
@@ -91,7 +87,7 @@ const lastSummary = computed<string | null>(function () {
 <style lang="scss" scoped>
 // 日志项基础样式
 .log-itm__container {
-  padding: 8px 12px;
+  padding: 8px 12px 8px 6px;
   border-radius: 6px;
   cursor: pointer;
   transition: background-color 0.2s ease;
@@ -114,18 +110,27 @@ const lastSummary = computed<string | null>(function () {
   align-items: flex-start;
   font-size: 13px;
 
-  .log-itm__simple-icon {
-    margin-right: 8px;
+  .log-itm__simple-aside {
     color: #909399;
     display: flex;
+    flex-direction: column;
     align-items: center;
     margin-top: 2px;
+    margin-right: 6px;
+    gap: 4px;
+    min-width: 24px;
+
+    .log-itm__simple-aside__index {
+      font-size: 10px;
+      color: #b5b5b5;
+    }
   }
 
   .log-itm__simple-text {
     color: #303133;
     white-space: pre-wrap;
-    word-break: break-all;
+    text-wrap: pretty;
+    overflow-wrap: break-word;
     flex: 1;
     line-height: 1.5;
   }
@@ -153,9 +158,8 @@ const lastSummary = computed<string | null>(function () {
 
   .log-itm__container-main {
     .log-itm__container-main-summary {
-      font-size: 12px;
-      color: #606266;
-      line-height: 1.4;
+      font-size: 11px;
+      color: #919397;
       white-space: pre-wrap;
       word-break: break-all;
       display: -webkit-box;

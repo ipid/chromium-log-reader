@@ -11,6 +11,9 @@ export type SimpleLogContent = {
 
   /** 日志的文本内容 */
   readonly text: string
+
+  /** 日志序号 */
+  readonly index: number
 }
 
 /**
@@ -22,6 +25,9 @@ export type ContainerLogContent = {
 
   /** 容器日志的标题，从日志的函数名中获取 */
   readonly title: string
+
+  /** 保证对于不同的 ContainerLogContent 对象，其 uniqueId 是唯一的 */
+  readonly uniqueId: string
 
   /** 容器日志所包含的子日志，有可能是简单日志，也有可能是容器日志 */
   readonly subLogs: readonly LogContent[]

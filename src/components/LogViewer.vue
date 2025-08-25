@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import LogColumn from './LogColumn.vue'
-import type { LogContent } from '../types/log'
+import { LogType, type ContainerLogContent, type LogContent } from '../types/log'
+import { computed } from 'vue'
 
 /**
  * 日志查看器组件
@@ -8,11 +9,8 @@ import type { LogContent } from '../types/log'
  * 每列展示一个层级的日志，点击某列中的容器日志时，右侧会显示其子日志
  */
 const props = defineProps<{
-  columns: {
-    title: string | null
-    items: LogContent[]
-  }[]
-  activePath: LogContent[]
+  rootLog: ContainerLogContent
+  activePath: ContainerLogContent[]
 }>()
 
 /**
@@ -22,6 +20,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'itemClick', item: LogContent, columnIndex: number): void
 }>()
+
+const columns = computed(() => {
+  return [props.rootLog, ...props.activePath]
+})
 
 /**
  * 处理日志项点击事件
@@ -34,37 +36,37 @@ function handleItemClick(item: LogContent, columnIndex: number): void {
 
 <template>
   <div class="log-vw__container">
-    <div v-if="columns.length === 0" class="log-vw__empty">
-      <span>暂无日志数据，请先输入日志内容</span>
-    </div>
-    <template v-else>
-      <LogColumn
-        v-for="(column, columnIndex) in columns"
-        :key="'column-' + columnIndex"
-        :items="column.items"
-        :title="column.title"
-        :active-item="activePath[columnIndex] ?? null"
-        @item-click="
-          function (item) {
-            handleItemClick(item, columnIndex)
-          }
-        "
-        class="log-vw__column"
-      />
-    </template>
+    <LogColumn
+      v-for="(column, columnIndex) in columns"
+      :key="`${column.uniqueId}-${columnIndex}`"
+      :items="column.subLogs"
+      :title="column.title"
+      :active-item="activePath[columnIndex] ?? null"
+      @item-click="(item) => handleItemClick(item, columnIndex)"
+      class="log-vw__column"
+    />
   </div>
 </template>
 
 <style lang="scss" scoped>
+@use '../styles/constants.scss' as constants;
+
 .log-vw__container {
+  width: 100%;
+  min-width: 0;
   display: flex;
   flex-direction: row;
   justify-content: flex-start;
   align-items: stretch;
-  height: 100%;
-  overflow: auto hidden;
+  overflow: scroll hidden;
   position: relative;
+  $horizontal-padding: 16px;
+  padding: 12px calc(100% - constants.$log-column-width - $horizontal-padding) 0 $horizontal-padding;
   gap: 12px;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
 
   .log-vw__empty {
     display: flex;
@@ -77,10 +79,6 @@ function handleItemClick(item: LogContent, columnIndex: number): void {
 
   .log-vw__column {
     flex-shrink: 0;
-
-    &:last-child {
-      border-right: none;
-    }
   }
 }
 </style>

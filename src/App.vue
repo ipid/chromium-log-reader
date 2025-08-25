@@ -2,62 +2,40 @@
 import { ref, computed } from 'vue'
 import { ElButton, ElDrawer, ElInput } from 'element-plus'
 import LogViewer from './components/LogViewer.vue'
-import { parseLog } from './services/logParser'
+import { parseLogs } from './utils/logParser'
 import type { LogContent, ContainerLogContent } from './types/log'
 import { LogType } from './types/log'
+import { Plus, Edit } from '@element-plus/icons-vue'
 
 const isDrawerVisible = ref(false)
 const rawLog = ref('')
-const rootLog = ref<ContainerLogContent | null>(null)
-const activePath = ref<LogContent[]>([])
+const rootLog = ref<ContainerLogContent>({
+  // 空容器占位
+  type: LogType.Container,
+  title: '',
+  uniqueId: '',
+  subLogs: [],
+})
+const activePath = ref<ContainerLogContent[]>([])
 
 const hasLog = computed(() => {
-  return rootLog.value !== null && rootLog.value.subLogs.length > 0
-})
-
-const columns = computed(() => {
-  if (rootLog.value === null) {
-    return []
-  }
-
-  const cols: {
-    title: string | null
-    items: LogContent[]
-  }[] = [
-    {
-      title: rootLog.value.title,
-      items: [...rootLog.value.subLogs],
-    },
-  ]
-
-  for (const activeItem of activePath.value) {
-    if (activeItem.type === LogType.Container && activeItem.subLogs.length > 0) {
-      cols.push({
-        title: activeItem.title,
-        items: [...activeItem.subLogs],
-      })
-    } else {
-      break
-    }
-  }
-  return cols
+  return rootLog.value.subLogs.length > 0
 })
 
 function handleParseLog() {
-  const { rootLog: parsedLog } = parseLog(rawLog.value)
+  const parsedLog = parseLogs(rawLog.value)
   rootLog.value = parsedLog
   activePath.value = []
   isDrawerVisible.value = false
 }
 
 function handleItemClick(item: LogContent, columnIndex: number) {
-  const currentActiveItem = activePath.value[columnIndex]
-
-  if (currentActiveItem === item) {
-    activePath.value.splice(columnIndex)
-  } else {
-    activePath.value.splice(columnIndex, activePath.value.length - columnIndex, item)
+  if (item.type !== LogType.Container) {
+    return
   }
+
+  activePath.value.splice(columnIndex)
+  activePath.value.push(item)
 }
 </script>
 
@@ -65,13 +43,13 @@ function handleItemClick(item: LogContent, columnIndex: number) {
   <div class="app__container">
     <header class="app__header">
       <h1 class="app__header-title">日志阅读器</h1>
-      <ElButton @click="isDrawerVisible = true">
+      <ElButton :icon="hasLog ? Edit : Plus" @click="isDrawerVisible = true">
         {{ hasLog ? '重新输入日志' : '输入日志' }}
       </ElButton>
     </header>
 
     <main class="app__main">
-      <LogViewer v-if="hasLog" :columns="columns" :active-path="activePath" @item-click="handleItemClick" />
+      <LogViewer v-if="hasLog" :root-log="rootLog" :active-path="activePath" @item-click="handleItemClick" />
       <div v-else class="app__main-placeholder">
         <span>点击右上角按钮输入日志内容开始使用</span>
       </div>
@@ -120,13 +98,14 @@ function handleItemClick(item: LogContent, columnIndex: number) {
 .app__main {
   flex-grow: 1;
   overflow: hidden;
-  padding: 16px;
+  display: flex;
 
   .app__main-placeholder {
+    width: 100%;
+    height: 100%;
     display: flex;
     justify-content: center;
     align-items: center;
-    height: 100%;
     color: #909399;
   }
 }
@@ -135,13 +114,15 @@ function handleItemClick(item: LogContent, columnIndex: number) {
   display: flex;
   flex-direction: column;
   height: 100%;
-  padding: 0 24px 24px;
 
   .app__drawer-textarea {
-    flex-grow: 1;
+    flex: 1 0 0;
+    min-height: 0;
+
     margin-bottom: 16px;
     display: flex;
     flex-direction: column;
+
     :deep(.el-textarea__inner) {
       flex-grow: 1;
       resize: none;
