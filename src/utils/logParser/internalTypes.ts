@@ -24,4 +24,5 @@ export type ParsedSingleLogLine = {
   readonly index: number
   readonly stack: number[]
   readonly message: string
+  readonly stackTrace: string
 }

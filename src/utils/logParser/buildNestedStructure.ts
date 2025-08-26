@@ -46,7 +46,7 @@ export function buildNestedStructure(
   }
 
   for (const line of parsedLines) {
-    const { index, stack, message } = line
+    const { index, stack, message, stackTrace } = line
     let parentContainer: MutableContainer = virtualRoot
 
     // 按照 stack 沿着上一条日志的树路径前进
@@ -73,6 +73,7 @@ export function buildNestedStructure(
       type: LogType.Simple,
       text: message,
       index,
+      stackTrace,
     })
   }
 
@@ -81,7 +82,7 @@ export function buildNestedStructure(
     return {
       type: LogType.Container,
       title: '',
-      uniqueId: '<root>',
+      uniqueId: '-1',
       subLogs: [],
     }
   }

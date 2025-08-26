@@ -2,8 +2,8 @@
 import { computed } from 'vue'
 import type { LogContent, SimpleLogContent } from '../types/log'
 import { LogType } from '../types/log'
-import { ElIcon } from 'element-plus'
-import { MoreFilled, Document } from '@element-plus/icons-vue'
+import { ElIcon, ElButton, ElMessage } from 'element-plus'
+import { MoreFilled, Document, CopyDocument } from '@element-plus/icons-vue'
 
 /**
  * 日志项组件，用于显示单条日志或日志容器
@@ -38,6 +38,30 @@ const lastSummary = computed<string | null>(function () {
   }
   return simpleLogs.at(-1)!.text
 })
+
+/**
+ * 检查简单日志是否有堆栈信息
+ */
+const hasStackTrace = computed<boolean>(() => {
+  return props.item.type === LogType.Simple && props.item.stackTrace.trim() !== ''
+})
+
+/**
+ * 复制堆栈信息到剪贴板
+ */
+async function copyStackTrace() {
+  if (props.item.type !== LogType.Simple || !props.item.stackTrace.trim()) {
+    return
+  }
+
+  try {
+    await navigator.clipboard.writeText(props.item.stackTrace)
+    ElMessage.success('已复制堆栈信息到剪贴板')
+  } catch (err) {
+    console.error('复制失败:', err)
+    ElMessage.error('复制失败，请重试')
+  }
+}
 </script>
 
 <template>
@@ -56,8 +80,20 @@ const lastSummary = computed<string | null>(function () {
         </ElIcon>
         <span class="log-itm__simple-aside__index">#{{ item.index }}</span>
       </div>
-      <div class="log-itm__simple-text">
-        {{ item.text || '空日志' }}
+      <div class="log-itm__simple-content">
+        <div class="log-itm__simple-text">
+          {{ item.text || '空日志' }}
+        </div>
+        <ElButton
+          v-if="hasStackTrace"
+          :icon="CopyDocument"
+          size="small"
+          text
+          type="primary"
+          class="log-itm__copy-btn"
+          @click.stop="copyStackTrace"
+          title="复制堆栈信息"
+        />
       </div>
     </div>
 
@@ -126,13 +162,45 @@ const lastSummary = computed<string | null>(function () {
     }
   }
 
-  .log-itm__simple-text {
-    color: #303133;
-    white-space: pre-wrap;
-    text-wrap: pretty;
-    overflow-wrap: break-word;
-    flex: 1;
-    line-height: 1.5;
+  .log-itm__simple-content {
+    flex: 1 0 0;
+    min-width: 0;
+    display: flex;
+    gap: 8px;
+
+    .log-itm__simple-text {
+      flex: 1 0 0;
+      min-width: 0;
+      color: #303133;
+      white-space: pre-wrap;
+      text-wrap: pretty;
+      overflow-wrap: break-word;
+      flex: 1;
+      line-height: 1.5;
+    }
+  }
+}
+
+.log-itm__copy-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  padding: 0 4px !important;
+  min-width: unset !important;
+  height: 20px !important;
+  font-size: 12px;
+  flex-shrink: 0;
+  margin-top: 1px;
+
+  &:deep(.el-button__text-content) {
+    display: none;
+  }
+
+  .log-itm__container:hover & {
+    opacity: 0.6;
+  }
+
+  &:hover {
+    opacity: 1 !important;
   }
 }
 

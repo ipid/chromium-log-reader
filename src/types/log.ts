@@ -14,6 +14,9 @@ export type SimpleLogContent = {
 
   /** 日志序号 */
   readonly index: number
+
+  /** 日志的堆栈信息 */
+  readonly stackTrace: string
 }
 
 /**

@@ -10,7 +10,7 @@
     "build-only": "vite build",
     "type-check": "vue-tsc --build",
     "format": "prettier --write ./",
-    "test": "vitest --coverage.enabled=false --no-file-parallelism --run"
+    "test": "vitest --coverage.enabled=false --run"
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",

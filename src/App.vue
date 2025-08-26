@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 import { ref, computed } from 'vue'
-import { ElButton, ElDrawer, ElInput } from 'element-plus'
+import { ElButton, ElDrawer, ElInput, ElMessage } from 'element-plus'
 import LogViewer from './components/LogViewer.vue'
 import { parseLogs } from './utils/logParser'
 import type { LogContent, ContainerLogContent } from './types/log'
@@ -23,8 +23,14 @@ const hasLog = computed(() => {
 })
 
 function handleParseLog() {
-  const parsedLog = parseLogs(rawLog.value)
-  rootLog.value = parsedLog
+  const parsedLogResult = parseLogs(rawLog.value)
+  if (parsedLogResult.subLogs.length === 0) {
+    ElMessage.warning('解析失败，请检查日志内容')
+    return
+  }
+
+  rootLog.value = parsedLogResult
+  rawLog.value = ''
   activePath.value = []
   isDrawerVisible.value = false
 }
@@ -55,8 +61,14 @@ function handleItemClick(item: LogContent, columnIndex: number) {
       </div>
     </main>
 
-    <ElDrawer v-model="isDrawerVisible" title="输入日志内容" direction="btt" size="60%">
-      <div class="app__drawer">
+    <ElDrawer
+      v-model="isDrawerVisible"
+      header-class="app__drawer-header"
+      title="输入日志内容"
+      direction="btt"
+      size="60%"
+    >
+      <div class="app__drawer-content">
         <ElInput
           v-model="rawLog"
           type="textarea"
@@ -110,12 +122,17 @@ function handleItemClick(item: LogContent, columnIndex: number) {
   }
 }
 
-.app__drawer {
+:deep(.app__drawer-header) {
+  margin-bottom: 0 !important;
+}
+
+.app__drawer-content {
   display: flex;
   flex-direction: column;
   height: 100%;
 
   .app__drawer-textarea {
+    resize: none;
     flex: 1 0 0;
     min-height: 0;
 
@@ -126,6 +143,7 @@ function handleItemClick(item: LogContent, columnIndex: number) {
     :deep(.el-textarea__inner) {
       flex-grow: 1;
       resize: none;
+      contain: strict;
     }
   }
 }
